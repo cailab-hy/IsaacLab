@@ -588,6 +588,22 @@ class AssemblyEnv(DirectRLEnv):
         # Only log episode success rates at the end of an episode.
         if torch.any(self.reset_buf):
             self.extras["successes"] = torch.count_nonzero(curr_successes) / self.num_envs
+            # ---------------------------------------------------------------------------------------------------
+            if not self.cfg_task.if_train:
+                self.nonzero_success_ids_for_test = self.ep_succeeded.nonzero(as_tuple=False).squeeze(-1)
+    
+                self.total_success_rates = np.append(self.total_success_rates, self.extras["successes"].item())
+                self.test_attempt += 1
+                print(f"=== {self.test_attempt} attempt =========================================")
+                print(f'Average success rates: {self.extras["successes"].item()*100:.2f}') 
+    
+                if self.test_attempt >= self.total_test_attempt:
+                    total_success_avg = np.mean(self.total_success_rates)
+                    total_success_std = np.std(self.total_success_rates)
+                    print(f"\n!!!!! Total Success rates, Avg: {total_success_avg*100:.2f}, Std: {total_success_std*100:.2f} !!!!!\n")
+                    self.extras["terminate"] = True
+                    exit(0)
+            # ---------------------------------------------------------------------------------------------------
 
         # Get the time at which an episode first succeeds.
         first_success = torch.logical_and(curr_successes, torch.logical_not(self.ep_succeeded))
@@ -603,23 +619,6 @@ class AssemblyEnv(DirectRLEnv):
 
         for rew_name, rew in rew_dict.items():
             self.extras[f"logs_rew_{rew_name}"] = rew.mean()
-
-        # ---------------------------------------------------------------------------------------------------
-        if not self.cfg_task.if_train:
-            self.nonzero_success_ids_for_test = self.ep_succeeded.nonzero(as_tuple=False).squeeze(-1)
-
-            self.total_success_rates = np.append(self.total_success_rates, self.extras["successes"].item())
-            self.test_attempt += 1
-            print(f"=== {self.test_attempt} attempt =========================================")
-            print(f'Average success rates: {self.extras["successes"].item()*100:.2f}') 
-
-            if self.test_attempt >= self.total_test_attempt:
-                total_success_avg = np.mean(self.total_success_rates)
-                total_success_std = np.std(self.total_success_rates)
-                print(f"\n!!!!! Total Success rates, Avg: {total_success_avg*100:.2f}, Std: {total_success_std*100:.2f} !!!!!\n")
-                self.extras["terminate"] = True
-                exit(0)
-        # ---------------------------------------------------------------------------------------------------
 
     def _get_rewards(self):
         """Update rewards and compute success statistics."""
